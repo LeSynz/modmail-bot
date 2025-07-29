@@ -9,8 +9,8 @@ module.exports = {
 		logger.info(`Bot is running in ${client.guilds.cache.size} servers`);
 
 		// Set bot activity
-		client.user.setActivity('with Discord.js v14', {
-			type: ActivityType.Playing,
+		client.user.setActivity('DMs for ModMail', {
+			type: ActivityType.Listening,
 		});
 	},
 };
