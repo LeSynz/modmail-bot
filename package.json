@@ -1,0 +1,28 @@
+{
+  "name": "synz-modmail-bot",
+  "version": "1.0.0",
+  "description": "A Open Source Discord Modmail Bot Template",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "discord.js",
+    "template"
+  ],
+  "author": "LeSynz (synz.xyz)",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^17.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.11.0"
+  }
+}
