@@ -21,6 +21,22 @@ module.exports = {
 			return;
 		}
 
+		// load sessions at the start - i lowkey fucked this up in the last commit <3
+		let sessions = { users: {}, channels: {} };
+		if (fs.existsSync(sessionsPath)) {
+			try {
+				const data = fs.readFileSync(sessionsPath, 'utf8');
+				sessions = data
+					? JSON.parse(data)
+					: { users: {}, channels: {} };
+			} catch (err) {
+				logger.error(
+					'Failed to parse modmail-sessions.json, resetting file.'
+				);
+				sessions = { users: {}, channels: {} };
+			}
+		}
+
 		if (message.channel.type === ChannelType.DM) {
 			logger.info(
 				`Received DM from ${message.author.tag}: ${message.content}`
@@ -35,35 +51,16 @@ module.exports = {
 			if (!modmailCategory)
 				return logger.error('Modmail category not found.');
 
-			// Load sessions safely
-			let sessions = { users: {}, channels: {} };
-			if (fs.existsSync(sessionsPath)) {
-				try {
-					const data = fs.readFileSync(sessionsPath, 'utf8');
-					sessions = data
-						? JSON.parse(data)
-						: { users: {}, channels: {} };
-				} catch (err) {
-					logger.error(
-						'Failed to parse modmail-sessions.json, resetting file.'
-					);
-					sessions = { users: {}, channels: {} };
-				}
-			}
-
 			let channel;
-			// Check if user already has a session
 			if (sessions.users[message.author.id]) {
 				const channelId = sessions.users[message.author.id];
 				channel = guild.channels.cache.get(channelId);
-				// If channel doesn't exist (maybe deleted), remove session and create new
 				if (!channel) {
 					delete sessions.users[message.author.id];
 					delete sessions.channels[channelId];
 				}
 			}
 
-			// If no channel found, create a new one
 			if (!channel) {
 				logger.info(
 					`Creating new modmail channel for ${message.author.tag}`
@@ -75,13 +72,11 @@ module.exports = {
 					topic: `Modmail channel for ${message.author.tag}`,
 					permissionOverwrites: [
 						{
-							id: guild.roles.everyone, // Deny everyone
+							id: guild.roles.everyone,
 							deny: ['ViewChannel'],
 						},
-						// Staff roles will be added below
 					],
 				});
-				// Allow staff roles
 				for (const roleId of modmailConfig.staffRoleIds) {
 					const role = guild.roles.cache.get(roleId);
 					if (role) {
@@ -122,7 +117,6 @@ module.exports = {
 					],
 				});
 
-				// Update sessions
 				sessions.users[message.author.id] = channel.id;
 				sessions.channels[channel.id] = message.author.id;
 				fs.writeFileSync(
@@ -131,7 +125,6 @@ module.exports = {
 				);
 			}
 
-			// Send the user's message to the modmail channel
 			await channel.send({
 				embeds: [
 					createModmailEmbed(
@@ -150,6 +143,76 @@ module.exports = {
 			logger.success(
 				`Forwarded message from ${message.author.tag} to modmail channel`
 			);
+		}
+
+		// check if message is in a modmail channel, if so then dm it to the user associated to the channel.
+		if (message.channel.parentId === modmailConfig.categoryId) {
+			const userId = sessions.channels[message.channel.id];
+			if (!userId) {
+				logger.error(
+					`No user found for modmail channel ${message.channel.id}`
+				);
+
+				await message.channel.send({
+					embeds: [
+						createResponseEmbed(
+							'Error',
+							'This modmail channel is not associated with any user.',
+							'#ff4a4a',
+							{
+								footer: 'ModMail System',
+								footerIcon: message.guild.iconURL(),
+								timestamp: true,
+							}
+						),
+					],
+				});
+			}
+			const user = await message.client.users.fetch(userId);
+			if (!user) {
+				logger.error(`User not found for ID ${userId}`);
+
+				await message.channel.send({
+					embeds: [
+						createResponseEmbed(
+							'Error',
+							'The user associated with this modmail channel could not be found.',
+							'#ff4a4a',
+							{
+								footer: 'ModMail System',
+								footerIcon: message.guild.iconURL(),
+								timestamp: true,
+							}
+						),
+					],
+				});
+			}
+			await user.send({
+				embeds: [
+					createResponseEmbed(
+						'New ModMail Message',
+						`New message from \`${message.author.tag}\` (${message.author.id})\n${message.content}`,
+						'#606cf4'
+					),
+				],
+			});
+			logger.success(
+				`Forwarded message from modmail channel ${message.channel.id} to user ${user.tag}`
+			);
+			await message.channel.send({
+				embeds: [
+					createResponseEmbed(
+						'Message Sent',
+						`Your message has been sent to ${user.tag}.`,
+						'#86f986',
+						{
+							footer: 'ModMail System',
+							footerIcon: message.guild.iconURL(),
+							timestamp: true,
+						}
+					),
+				],
+			});
 		}
 	},
 };
